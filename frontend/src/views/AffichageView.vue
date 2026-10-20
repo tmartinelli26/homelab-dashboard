@@ -1,10 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import CarteTrains from '../components/CarteTrains.vue'
 
 const CAPTEURS = {
   temperature: { libelle: 'Température', icone: '🌡️', couleur: '#ff9e64' },
-  humidite: { libelle: 'Humidité', icone: '💧', couleur: '#7dcfff' },
-  pression: { libelle: 'Pression', icone: '🧭', couleur: '#bb9af7' },
   pas: { libelle: 'Pas du jour', icone: '👟', couleur: '#9ece6a' },
   fc: { libelle: 'Cardio', icone: '❤️', couleur: '#f7768e' },
 }
@@ -14,6 +13,8 @@ const OBJECTIF_PAS = 10000
 
 const projets = ref([])
 const homelab = ref({})
+const trains = ref(null)
+const trainsPerime = ref(false)
 const maintenant = ref(new Date())
 let minuteurDonnees = null
 let minuteurHorloge = null
@@ -58,7 +59,23 @@ function activite(projet) {
   return `il y a ${j} jours`
 }
 
+async function chargerTrains() {
+  try {
+    const reponse = await fetch('/api/trains')
+    if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`)
+    const donnees = await reponse.json()
+    trains.value = donnees.trains
+    trainsPerime.value = donnees.perime
+  } catch (err) {
+    console.error('[trains]', err.message)
+    trainsPerime.value = trains.value !== null // on garde l'ancienne liste en la signalant
+  }
+}
+
 async function charger() {
+  // Lancé à part, sans await : une panne de l'API CFF ne bloque pas le reste
+  chargerTrains()
+
   try {
     const [repProjets, repHomelab] = await Promise.all([
       fetch('/api/projets'),
@@ -96,6 +113,14 @@ onUnmounted(() => {
       </div>
     </header>
 
+    <div class="colonne-gauche">
+    <CarteTrains
+      class="carte trains"
+      :trains="trains"
+      :perime="trainsPerime"
+      :maintenant="maintenant"
+    />
+
     <section class="capteurs">
       <article
         v-for="(info, cle, i) in CAPTEURS"
@@ -118,29 +143,30 @@ onUnmounted(() => {
         </div>
       </article>
     </section>
+    </div>
 
-    <section class="projets">
-      <h2 class="titre-section">Projets en cours</h2>
-      <ul>
-        <li
-          v-for="(projet, i) in projetsVisibles"
-          :key="projet.id"
-          class="carte projet"
-          :class="[`p${projet.priorite}`, { dort: joursDepuis(projet.derniere_activite) > 14 }]"
-          :style="{ animationDelay: `${300 + i * 80}ms` }"
-        >
-          <div class="ligne">
-            <strong>{{ projet.nom }}</strong>
-            <span class="badge" :class="projet.statut">{{ STATUTS[projet.statut] }}</span>
-          </div>
-          <p class="etape">{{ projet.prochaine_etape ?? 'Pas de prochaine étape' }}</p>
-          <div class="meta">
-            <span v-if="projet.categorie" class="chip">{{ projet.categorie }}</span>
-            <span>{{ activite(projet) }}</span>
-          </div>
-        </li>
-      </ul>
-    </section>
+      <section class="projets">
+        <h2 class="titre-section">Projets en cours</h2>
+        <ul>
+          <li
+            v-for="(projet, i) in projetsVisibles"
+            :key="projet.id"
+            class="carte projet"
+            :class="[`p${projet.priorite}`, { dort: joursDepuis(projet.derniere_activite) > 14 }]"
+            :style="{ animationDelay: `${300 + i * 80}ms` }"
+          >
+            <div class="ligne">
+              <strong>{{ projet.nom }}</strong>
+              <span class="badge" :class="projet.statut">{{ STATUTS[projet.statut] }}</span>
+            </div>
+            <p class="etape">{{ projet.prochaine_etape ?? 'Pas de prochaine étape' }}</p>
+            <div class="meta">
+              <span v-if="projet.categorie" class="chip">{{ projet.categorie }}</span>
+              <span>{{ activite(projet) }}</span>
+            </div>
+          </li>
+        </ul>
+      </section>
   </main>
 </template>
 
@@ -163,7 +189,7 @@ onUnmounted(() => {
 /* En-tête */
 .entete { grid-column: 1 / -1; display: flex; align-items: flex-end; justify-content: space-between; }
 .heure {
-  font-size: 15vh;
+  font-size: 11vh;
   font-weight: 800;
   line-height: 0.9;
   letter-spacing: -0.05em;
@@ -173,10 +199,10 @@ onUnmounted(() => {
   background-clip: text;
   color: transparent;
 }
-.date { font-size: 3.4vh; color: var(--doux); text-transform: capitalize; margin-top: 1.2vh; font-weight: 500; }
+.date { font-size: 2.6vh; color: var(--doux); text-transform: capitalize; margin-top: 1vh; font-weight: 500; }
 .resume { text-align: right; display: flex; flex-direction: column; }
-.resume-chiffre { font-size: 9vh; font-weight: 800; line-height: 1; color: var(--accent); }
-.resume-texte { font-size: 2vh; color: var(--doux); text-transform: uppercase; letter-spacing: 0.14em; font-weight: 600; }
+.resume-chiffre { font-size: 7vh; font-weight: 800; line-height: 1; color: var(--accent); }
+.resume-texte { font-size: 1.7vh; color: var(--doux); text-transform: uppercase; letter-spacing: 0.14em; font-weight: 600; }
 
 /* Cartes */
 .carte {
@@ -189,9 +215,14 @@ onUnmounted(() => {
 }
 
 /* Capteurs */
-.capteurs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 2.2vh 1.4vw; min-height: 0; }
+/* Colonne de gauche : trains en haut, tuiles capteurs en dessous */
+.colonne-gauche { display: flex; flex-direction: column; gap: 2.5vh; min-height: 0; }
+.trains { padding: 2vh 1.6vw; flex-shrink: 0; animation-delay: 200ms; }
+
+.capteurs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.4vw; }
 .capteur {
-  padding: 2.6vh 1.6vw;
+  aspect-ratio: 1;
+  padding: 2vh 1.2vw;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -209,21 +240,19 @@ onUnmounted(() => {
   opacity: 0.22;
   pointer-events: none;
 }
-.capteur:first-child { grid-column: span 2; }
-.capteur-haut { display: flex; align-items: center; gap: 1vw; }
+.capteur-haut { display: flex; flex-direction: column; align-items: flex-start; gap: 1vh; }
 .icone {
-  width: 6.5vh;
-  height: 6.5vh;
+  width: 4.5vh;
+  height: 4.5vh;
   display: grid;
   place-items: center;
-  font-size: 3.4vh;
+  font-size: 2.3vh;
   border-radius: 18px;
   background: color-mix(in srgb, var(--c) 20%, transparent);
   border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
 }
-.libelle { font-size: 2.1vh; color: var(--doux); text-transform: uppercase; letter-spacing: 0.14em; font-weight: 600; }
-.valeur { font-size: 8.5vh; font-weight: 800; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
-.capteur:first-child .valeur { font-size: 12vh; }
+.libelle { font-size: 1.6vh; color: var(--doux); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600; }
+.valeur { font-size: 5.5vh; font-weight: 800; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
 .valeur small { font-size: 0.36em; font-weight: 600; color: var(--c); margin-left: 0.3em; letter-spacing: 0; }
 
 .barre { height: 1.1vh; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; margin-top: 1.4vh; }
@@ -241,10 +270,10 @@ onUnmounted(() => {
 
 /* Projets */
 .projets { display: flex; flex-direction: column; min-height: 0; }
-.titre-section { font-size: 2.1vh; color: var(--doux); text-transform: uppercase; letter-spacing: 0.14em; font-weight: 600; margin-bottom: 1.8vh; }
-.projets ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 1.8vh; overflow: hidden; }
+.titre-section { font-size: 1.8vh; color: var(--doux); text-transform: uppercase; letter-spacing: 0.14em; font-weight: 600; margin-bottom: 1.8vh; }
+.projets ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 1.4vh; overflow: hidden; }
 
-.projet { padding: 2.4vh 1.8vw 2.4vh 2.2vw; position: relative; }
+.projet { padding: 1.8vh 1.6vw 1.8vh 2vw; position: relative; }
 .projet::before {
   content: '';
   position: absolute;
@@ -261,7 +290,7 @@ onUnmounted(() => {
 .dort { opacity: 0.45; }
 
 .ligne { display: flex; justify-content: space-between; align-items: center; gap: 1vw; }
-.ligne strong { font-size: 3.6vh; font-weight: 700; letter-spacing: -0.02em; }
+.ligne strong { font-size: 2.8vh; font-weight: 700; letter-spacing: -0.02em; }
 .badge {
   font-size: 1.7vh;
   padding: 0.6vh 1vw;
@@ -275,9 +304,9 @@ onUnmounted(() => {
 .badge.en_pause { background: rgba(224, 175, 104, 0.16); color: var(--orange); }
 .badge.idee { background: rgba(187, 154, 247, 0.16); color: var(--violet); }
 
-.etape { margin-top: 1.1vh; font-size: 2.6vh; opacity: 0.92; }
+.etape { margin-top: 0.8vh; font-size: 2.1vh; opacity: 0.92; }
 .etape::before { content: '→ '; color: var(--accent); font-weight: 700; }
-.meta { margin-top: 1.4vh; display: flex; align-items: center; gap: 1.2vw; color: var(--doux); font-size: 1.9vh; }
+.meta { margin-top: 1vh; display: flex; align-items: center; gap: 1.2vw; color: var(--doux); font-size: 1.6vh; }
 .chip { padding: 0.4vh 0.8vw; border-radius: 8px; background: rgba(255, 255, 255, 0.06); }
 
 /* Animations */

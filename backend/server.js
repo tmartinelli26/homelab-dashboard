@@ -1,6 +1,7 @@
 import express from 'express';
 import db from './db.js';
 import { lireEtat } from './homeassistant.js';
+import { lireTrains } from './cff.js';
 import { fileURLToPath } from 'node:url';
 
 const app = express();
@@ -114,6 +115,14 @@ app.get('/api/homelab', async (req, res) => {
   );
 
   res.json(Object.fromEntries(entrees));
+});
+
+app.get('/api/trains', async (req, res) => {
+  const resultat = await lireTrains();
+  if (!resultat.trains) {
+    return res.status(502).json({ erreur: 'API CFF indisponible' });
+  }
+  res.json(resultat);
 });
 
 const dossierFront = process.env.FRONT_DIR
