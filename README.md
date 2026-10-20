@@ -127,8 +127,9 @@ docker compose up -d --build
 
 ## 🗺️ Prochaines étapes
 
-- [ ] Temps réel via le WebSocket de Home Assistant (au lieu du polling)
 - [ ] Authentification sur l'interface d'admin
 - [ ] Rubans LED et lampe connectée
 - [ ] Données de sommeil et de consommation électrique
+- [ ] Horaire de train
+- [ ] Météo de la semaine
 - [ ] Intégration d'un LLM local (assistant vocal)
