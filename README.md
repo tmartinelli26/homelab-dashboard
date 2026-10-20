@@ -27,11 +27,11 @@ Projets ────────────────────────
 
 | Service | URL | Rôle |
 |---|---|---|
-| Home Assistant | `http://192.168.1.237:8123` | Collecteur, config |
-| ESPHome | `http://192.168.1.237:6052` | Firmware des ESP |
-| Dashboard | `http://192.168.1.237:3000` | Affichage (kiosque) |
-| Dashboard admin | `http://192.168.1.237:3000/admin` | Gestion des projets |
-| Station météo | `192.168.1.134` | ESP32-C3 + BME680 |
+| Home Assistant | `http://ip_local:8123` | Collecteur, config |
+| ESPHome | `http://ip_local:6052` | Firmware des ESP |
+| Dashboard | `http://ip_local:3000` | Affichage (kiosque) |
+| Dashboard admin | `http://ip_local:3000/admin` | Gestion des projets |
+| Station météo | `ip_local` | ESP32-C3 + BME680 |
 
 ---
 
@@ -45,7 +45,7 @@ Projets ────────────────────────
   PasswordAuthentication no
   PermitRootLogin no
   ```
-- **IP** : 192.168.1.237. ⚠️ Réservation DHCP dans la box encore à faire (serveur **et** ESP).
+- **IP** : ip_local. ⚠️ Réservation DHCP dans la box encore à faire (serveur **et** ESP).
 - **Outils** : `tmux` pour les longues opérations, Node 22 (pour le dev), `sqlite3`, `nmap` (sur le laptop).
 
 ### Réseau WiFi
