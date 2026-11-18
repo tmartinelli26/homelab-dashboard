@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import CarteTrains from '../components/CarteTrains.vue'
 
 const CAPTEURS = {
@@ -10,6 +10,11 @@ const CAPTEURS = {
 
 const STATUTS = { idee: 'Idée', actif: 'Actif', en_pause: 'En pause', termine: 'Terminé' }
 const OBJECTIF_PAS = 10000
+
+const NUIT_DEBUT = 1 // de 1h00…
+const NUIT_FIN = 6   // …à 5h59
+// Pour tester le mode nuit de jour : ouvrir http://<IP>:3000/?nuit
+const FORCER_NUIT = new URLSearchParams(window.location.search).has('nuit')
 
 const projets = ref([])
 const homelab = ref({})
@@ -39,6 +44,19 @@ const heure = computed(() =>
 const date = computed(() =>
   maintenant.value.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long' })
 )
+
+const modeNuit = computed(() => {
+  if (FORCER_NUIT) return true
+  const h = maintenant.value.getHours()
+  return h >= NUIT_DEBUT && h < NUIT_FIN
+})
+
+// Anti-marquage : l'heure se décale légèrement chaque minute
+// pour ne pas allumer les mêmes pixels pendant 5 heures
+const decalageNuit = computed(() => {
+  const m = maintenant.value.getMinutes()
+  return { transform: `translate(${((m % 7) - 3) * 2}vw, ${((m % 5) - 2) * 3}vh)` }
+})
 
 function formaterValeur(capteur) {
   if (!capteur) return '—'
@@ -73,6 +91,9 @@ async function chargerTrains() {
 }
 
 async function charger() {
+  // La nuit, rien n'est affiché : inutile d'interroger le backend et l'API CFF
+  if (modeNuit.value) return
+
   // Lancé à part, sans await : une panne de l'API CFF ne bloque pas le reste
   chargerTrains()
 
@@ -88,6 +109,11 @@ async function charger() {
   }
 }
 
+// Au réveil (6h), recharger tout de suite au lieu d'attendre le prochain tic de 30 s
+watch(modeNuit, (nuit) => {
+  if (!nuit) charger()
+})
+
 onMounted(() => {
   charger()
   minuteurDonnees = setInterval(charger, 30000)
@@ -101,7 +127,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="dashboard">
+  <Transition name="fondu" mode="out-in">
+  <div v-if="modeNuit" key="nuit" class="nuit">
+    <div class="heure-nuit" :style="decalageNuit">{{ heure }}</div>
+  </div>
+
+  <main v-else key="jour" class="dashboard">
     <header class="entete">
       <div>
         <div class="heure">{{ heure }}</div>
@@ -168,6 +199,7 @@ onUnmounted(() => {
         </ul>
       </section>
   </main>
+  </Transition>
 </template>
 
 <style scoped>
@@ -308,6 +340,30 @@ onUnmounted(() => {
 .etape::before { content: '→ '; color: var(--accent); font-weight: 700; }
 .meta { margin-top: 1vh; display: flex; align-items: center; gap: 1.2vw; color: var(--doux); font-size: 1.6vh; }
 .chip { padding: 0.4vh 0.8vw; border-radius: 8px; background: rgba(255, 255, 255, 0.06); }
+
+/* Mode nuit */
+.nuit {
+  height: 100vh;
+  background: #000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  cursor: none;
+}
+.heure-nuit {
+  font-size: 18vh;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  color: #2f3448; /* très sombre : lisible dans le noir sans éclairer la pièce */
+  transition: transform 3s ease;
+}
+
+/* Fondu entre le jour et la nuit */
+.fondu-enter-active,
+.fondu-leave-active { transition: opacity 1.5s ease; }
+.fondu-enter-from,
+.fondu-leave-to { opacity: 0; }
 
 /* Animations */
 @keyframes apparition {
